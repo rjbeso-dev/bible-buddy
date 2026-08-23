@@ -302,3 +302,42 @@
 .profile-account-note {
   margin-bottom: 0.75rem;
 }
+
+/* ===========================================================================
+   Admin: signed-in users list
+   =========================================================================== */
+
+.admin-page {
+  max-width: var(--maxw-reader);
+}
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  white-space: nowrap;
+}
+.admin-table thead th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  font-weight: 700;
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border);
+}
+.admin-table tbody tr + tr td {
+  border-top: 1px solid var(--border);
+}
+.admin-table tbody tr:hover {
+  background: var(--surface-hover);
+}

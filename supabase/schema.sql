@@ -39,3 +39,24 @@ create policy "anyone can read a shared note by id" on public.shared_notes for s
 create policy "owner can share" on public.shared_notes for insert with check (auth.uid() = owner_id);
 create policy "owner can update their shared note" on public.shared_notes for update using (auth.uid() = owner_id);
 create policy "owner can unshare" on public.shared_notes for delete using (auth.uid() = owner_id);
+
+-- A minimal "who has signed in" directory for the site owner's simple admin
+-- list — one row per user, upserted by that user's own client on sign-in
+-- (never touching anyone else's row). Reading the full list is restricted to
+-- whichever email VITE_ADMIN_EMAIL is set to; everyone else's select just
+-- returns zero rows, not an error, if they ever hit that page.
+create table if not exists public.user_directory (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text not null,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+
+alter table public.user_directory enable row level security;
+
+create policy "own row upsert" on public.user_directory for insert with check (auth.uid() = user_id);
+create policy "own row update" on public.user_directory for update using (auth.uid() = user_id);
+-- Replace the email below with your own — this is the only account that can
+-- read the directory list (via the app's /admin page).
+create policy "admin can read the directory" on public.user_directory for select
+  using (auth.jwt() ->> 'email' = 'rjbeso@gmail.com');

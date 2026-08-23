@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { recordSignIn } from '../lib/adminDirectory'
 import { AuthContext, type AuthContextValue } from './authContext'
 
 /**
@@ -12,6 +13,16 @@ import { AuthContext, type AuthContextValue } from './authContext'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
+  // onAuthStateChange also fires for token refreshes, not just genuine
+  // sign-ins — only record a directory hit when the signed-in user actually
+  // changes, not on every ping.
+  const recordedFor = useRef<string | null>(null)
+
+  const maybeRecordSignIn = useCallback((next: User | null) => {
+    if (!next || recordedFor.current === next.id) return
+    recordedFor.current = next.id
+    void recordSignIn(next.id, next.email)
+  }, [])
 
   useEffect(() => {
     if (!supabase) return
@@ -19,21 +30,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return
-      setUser(data.session?.user ?? null)
+      const nextUser = data.session?.user ?? null
+      setUser(nextUser)
       setLoading(false)
+      maybeRecordSignIn(nextUser)
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const nextUser = session?.user ?? null
+      setUser(nextUser)
+      maybeRecordSignIn(nextUser)
     })
 
     return () => {
       cancelled = true
       subscription.unsubscribe()
     }
-  }, [])
+  }, [maybeRecordSignIn])
 
   const signInWithGoogle = useCallback(async () => {
     if (!supabase) return

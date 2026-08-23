@@ -9,6 +9,7 @@ import { NoteComposerPage } from './pages/NoteComposerPage'
 import { SearchPage } from './pages/SearchPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SharedNotePage } from './pages/SharedNotePage'
+import { AdminUsersPage } from './pages/AdminUsersPage'
 import { readLastRead } from './hooks/useLastRead'
 
 function useOnlineStatus(): boolean {
@@ -88,6 +89,7 @@ export default function App() {
             <Route path="/notes/:id" element={<NoteComposerRoute />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/shared/:id" element={<SharedNotePage />} />
+            <Route path="/admin" element={<AdminUsersPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </PageTransition>

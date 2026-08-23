@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
+import { isAdminEmail } from '../../lib/adminDirectory'
 import { Icon } from '../ui/Icon'
 
 /** Best available display name for the signed-in user. */
@@ -62,6 +63,11 @@ export function AccountControls() {
                 <Link to="/profile" className="button ghost small" onClick={() => setOpen(false)}>
                   View profile
                 </Link>
+                {isAdminEmail(user.email) && (
+                  <Link to="/admin" className="button ghost small" onClick={() => setOpen(false)}>
+                    Signed-in users
+                  </Link>
+                )}
                 <button
                   type="button"
                   className="button ghost small"

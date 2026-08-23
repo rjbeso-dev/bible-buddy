@@ -115,14 +115,17 @@ appears at all — this is entirely opt-in.
 
 1. **Create a free Supabase project** at [supabase.com](https://supabase.com).
 2. **Run the schema.** Open your project's SQL Editor and run
-   [`supabase/schema.sql`](supabase/schema.sql) — it creates two tables:
+   [`supabase/schema.sql`](supabase/schema.sql) — it creates three tables:
    `user_state` (a single JSON blob per signed-in user, protected by
-   Row-Level Security so each user can only ever read or write their own row)
-   and `shared_notes` (public "share this note" links — anyone with the link
-   can read a shared note, but only its owner can create, update, or revoke
-   one). If you already ran an older version of this file for `user_state`,
-   re-run it — `create table if not exists` makes it safe to run again, and
-   it'll add the new `shared_notes` table without touching existing data.
+   Row-Level Security so each user can only ever read or write their own row),
+   `shared_notes` (public "share this note" links — anyone with the link can
+   read a shared note, but only its owner can create, update, or revoke one),
+   and `user_directory` (a minimal "who's signed in" list — email plus
+   first/last-seen — readable only by the email hardcoded in the file's
+   "admin can read the directory" policy; if you use this, edit that email
+   before running the file). If you already ran an older version of this
+   file, re-run it — `create table if not exists` makes it safe to run
+   again, and it'll add any new tables without touching existing data.
 3. **Enable Google sign-in.** In Supabase: **Authentication → Providers →
    Google** → enable it. This needs a Google OAuth client from the
    [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
@@ -141,6 +144,14 @@ appears at all — this is entirely opt-in.
    actually protects the data.) Add the same two variables to your Vercel
    project's environment variables for production, then restart `npm run dev`
    or redeploy.
+5. **Optional: a "Signed-in users" admin page.** Set `VITE_ADMIN_EMAIL` to
+   your own email (same as above, in `.env.local` and Vercel) and it'll match
+   the email already in `supabase/schema.sql`'s RLS policy — sign in with
+   that account and a "Signed-in users" link appears in the account menu at
+   `/admin`, a plain list of everyone who's signed in (email, first/last
+   seen). Leave it unset to skip this entirely. This env var only shows the
+   link; the actual access control is the database policy, so keep the two
+   in sync if you ever change the email.
 
 Once configured, a "Sign in" item appears at the bottom of the rail. Signing in
 pulls any existing cloud data, merges it with what's on the device (newest
