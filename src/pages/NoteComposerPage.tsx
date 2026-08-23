@@ -9,6 +9,7 @@ import { plainTextToHtml, sanitizeNoteHtml } from '../lib/sanitizeNoteHtml'
 import { parseNoteHtml, noteFileName } from '../lib/noteDocument'
 import { exportNoteToPdf } from '../lib/exportNoteToPdf'
 import { exportNoteToDocx } from '../lib/exportNoteToDocx'
+import { shareNote, unshareNote, sharedNoteUrl } from '../lib/sharedNotes'
 import { Icon } from '../components/ui/Icon'
 
 type ExportFormat = 'pdf' | 'docx'
@@ -20,9 +21,9 @@ type ExportFormat = 'pdf' | 'docx'
 export function NoteComposerPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { notes, addStandaloneNote, updateNoteFields, deleteNote } = useNotes()
+  const { notes, addStandaloneNote, updateNoteFields, deleteNote, setNoteShareId } = useNotes()
   const { user, enabled } = useAuth()
-  const { promptSignIn } = useAuthGate()
+  const { promptSignIn, requireAuth } = useAuthGate()
   const existing = id ? notes.find((n) => n.id === id) : undefined
   const blockedForSignIn = !existing && enabled && !user
 
@@ -36,16 +37,22 @@ export function NoteComposerPage() {
   const [exportOpen, setExportOpen] = useState(false)
   const [exportBusy, setExportBusy] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
   const editorRef = useRef<RichTextEditorHandle>(null)
 
   useEffect(() => {
-    if (!exportOpen) return
+    if (!exportOpen && !shareOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setExportOpen(false)
+      if (e.key === 'Escape') {
+        setExportOpen(false)
+        setShareOpen(false)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [exportOpen])
+  }, [exportOpen, shareOpen])
 
   // Direct navigation to /notes/new (or a refresh mid-draft) bypasses the
   // gate on the "New note" buttons that link here — catch it at the route
@@ -114,6 +121,51 @@ export function NoteComposerPage() {
     }
   }
 
+  const openShare = () => {
+    requireAuth(() => setShareOpen((o) => !o), 'Sign in to share this note.')
+  }
+
+  const publish = async () => {
+    if (!existing || !user) return
+    const { html, text } = bodyRef.current
+    if (!text.trim()) return
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      const shareId = await shareNote(
+        { shareId: existing.shareId, title, reference, body: text.trim(), bodyHtml: html },
+        user.id,
+      )
+      setNoteShareId(existing.id, shareId)
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : 'Couldn’t share this note.')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const stopSharing = async () => {
+    if (!existing?.shareId) return
+    setShareBusy(true)
+    setShareError(null)
+    try {
+      await unshareNote(existing.shareId)
+      setNoteShareId(existing.id, undefined)
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : 'Couldn’t stop sharing.')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  const copyShareLink = () => {
+    if (!existing?.shareId) return
+    void navigator.clipboard.writeText(sharedNoteUrl(existing.shareId)).catch(() => {
+      // Clipboard permission can be denied — the link is still visible in
+      // the popover's input for the user to select and copy manually.
+    })
+  }
+
   return (
     <div className="note-composer-page">
       <div className="note-composer-layout">
@@ -128,6 +180,81 @@ export function NoteComposerPage() {
               <Icon name="chevron-left" />
             </button>
             <h1 className="page-title">{existing ? 'Edit note' : 'New note'}</h1>
+            {existing && enabled && (
+              <div className="note-export-menu">
+                <button
+                  type="button"
+                  className={'button ghost' + (existing.shareId ? ' is-active' : '')}
+                  aria-haspopup="dialog"
+                  aria-expanded={shareOpen}
+                  onClick={openShare}
+                >
+                  <Icon name="share" size={16} /> Share
+                </button>
+                {shareOpen && (
+                  <>
+                    <div className="popover-backdrop" onClick={() => setShareOpen(false)} aria-hidden="true" />
+                    <div className="note-share-panel" role="dialog" aria-label="Share note">
+                      {existing.shareId ? (
+                        <>
+                          <p className="note-share-hint">Anyone with this link can view this note.</p>
+                          <div className="note-share-link-row">
+                            <input
+                              type="text"
+                              readOnly
+                              className="settings-input"
+                              value={sharedNoteUrl(existing.shareId)}
+                              onFocus={(e) => e.target.select()}
+                            />
+                            <button type="button" className="button ghost small" onClick={copyShareLink}>
+                              Copy
+                            </button>
+                          </div>
+                          <div className="note-share-actions">
+                            <button
+                              type="button"
+                              className="button ghost small"
+                              onClick={publish}
+                              disabled={shareBusy}
+                            >
+                              {shareBusy ? 'Updating…' : 'Update link'}
+                            </button>
+                            <button
+                              type="button"
+                              className="button ghost small danger"
+                              onClick={stopSharing}
+                              disabled={shareBusy}
+                            >
+                              Stop sharing
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="note-share-hint">
+                            Create a public link anyone can open to read this note — no account needed on
+                            their end.
+                          </p>
+                          <button
+                            type="button"
+                            className="button primary small"
+                            onClick={publish}
+                            disabled={shareBusy || !hasBody}
+                          >
+                            {shareBusy ? 'Creating link…' : 'Create link'}
+                          </button>
+                        </>
+                      )}
+                      {shareError && (
+                        <p className="rich-editor-error" role="alert">
+                          {shareError}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <div className="note-export-menu">
               <button
                 type="button"

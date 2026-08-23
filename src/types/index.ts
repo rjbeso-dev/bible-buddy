@@ -96,6 +96,9 @@ export interface Note {
   body: string
   /** Sanitized rich-text HTML, when the note was written with formatting. */
   bodyHtml?: string
+  /** Present once this note has been published to a public share link
+   * (the id of its row in the `shared_notes` table). */
+  shareId?: string
   createdAt: number
   updatedAt: number
 }

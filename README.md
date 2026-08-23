@@ -55,7 +55,10 @@ Opening the app (`/`) shows a quiet study desk, not a redirect:
 - **Highlights**: tap a verse and pick from five theme-aware colors (or clear).
 - **Notes**: attach one or more notes to any verse; a dot marks verses that
   have notes. A dedicated Notes page lists everything grouped by book with
-  links straight back to the verse.
+  links straight back to the verse. Long-form notes support rich text,
+  export to PDF/Word, and — when signed in — a public "share this note"
+  link anyone can open without an account (see
+  [Accounts & sync](#accounts--sync-optional)).
 - **Verse context**: view a verse with the surrounding verses (crossing chapter
   boundaries when needed) in a focused popover.
 - **Book introductions** shown at the top of chapter 1 or via the info button.
@@ -112,9 +115,14 @@ appears at all — this is entirely opt-in.
 
 1. **Create a free Supabase project** at [supabase.com](https://supabase.com).
 2. **Run the schema.** Open your project's SQL Editor and run
-   [`supabase/schema.sql`](supabase/schema.sql) — it creates one table
-   (`user_state`) that stores a single JSON blob per signed-in user, protected
-   by Row-Level Security so each user can only ever read or write their own row.
+   [`supabase/schema.sql`](supabase/schema.sql) — it creates two tables:
+   `user_state` (a single JSON blob per signed-in user, protected by
+   Row-Level Security so each user can only ever read or write their own row)
+   and `shared_notes` (public "share this note" links — anyone with the link
+   can read a shared note, but only its owner can create, update, or revoke
+   one). If you already ran an older version of this file for `user_state`,
+   re-run it — `create table if not exists` makes it safe to run again, and
+   it'll add the new `shared_notes` table without touching existing data.
 3. **Enable Google sign-in.** In Supabase: **Authentication → Providers →
    Google** → enable it. This needs a Google OAuth client from the
    [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
@@ -180,6 +188,11 @@ project under your account:
 | `bsa.cache.chapter.*` | Cached chapter text (with an LRU index for eviction) |
 
 Clearing your browser storage for this site will remove all of the above.
+
+Sharing a note (see above) is the one deliberate exception: clicking "Share"
+publishes that note's content to a public `shared_notes` row in Supabase, so
+anyone with the link can read it without an account. Nothing is published
+until you explicitly share, and clicking "Stop sharing" deletes the row.
 
 ## Project structure
 

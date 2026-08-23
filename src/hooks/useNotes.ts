@@ -74,6 +74,8 @@ export interface UseNotesResult {
   addStandaloneNote: (input: StandaloneNoteInput) => SaveNoteResult
   /** Update any combination of a note's title/reference/body (standalone or verse-tied). */
   updateNoteFields: (id: string, patch: Partial<StandaloneNoteInput>) => SaveNoteResult
+  /** Record (or clear) a note's public share link id. */
+  setNoteShareId: (id: string, shareId: string | undefined) => void
 }
 
 export function useNotes(): UseNotesResult {
@@ -155,6 +157,15 @@ export function useNotes(): UseNotesResult {
     setNotes(getNotes().filter((n) => n.id !== id))
   }, [])
 
+  /** Record (or clear, passing undefined) a note's public share link id.
+   * Separate from updateNoteFields since it's system-managed, not part of
+   * the composer's editable fields. */
+  const setNoteShareId = useCallback((id: string, shareId: string | undefined) => {
+    setNotes(
+      getNotes().map((n) => (n.id === id ? { ...n, shareId } : n)),
+    )
+  }, [])
+
   const notesFor = useCallback(
     (verseKey: string) => notes.filter((n) => n.verseKey === verseKey),
     [notes],
@@ -174,5 +185,6 @@ export function useNotes(): UseNotesResult {
     hasNote,
     addStandaloneNote,
     updateNoteFields,
+    setNoteShareId,
   }
 }
