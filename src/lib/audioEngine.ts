@@ -15,12 +15,16 @@ export interface AmbientSceneOption {
   label: string
 }
 
-/** The four generated ambient scenes, in display order. */
+/** The generated ambient scenes, in display order. */
 export const AMBIENT_SCENES: AmbientSceneOption[] = [
   { id: 'rain', label: 'Rain' },
+  { id: 'ocean', label: 'Ocean waves' },
+  { id: 'wind', label: 'Wind' },
   { id: 'pad', label: 'Warm pad' },
   { id: 'brown', label: 'Brown noise' },
+  { id: 'white', label: 'White noise' },
   { id: 'chimes', label: 'Chimes' },
+  { id: 'crickets', label: 'Crickets' },
 ]
 
 /** Fade duration (seconds) used for start/stop/scene-change transitions. */
@@ -308,11 +312,199 @@ function buildChimes(audioCtx: AudioContext, destination: AudioNode): SceneHandl
   }
 }
 
+/** Ocean waves: brown noise with a slow, wide swell — like rain but lower
+ * and much slower, so it reads as rolling surf rather than rainfall. */
+function buildOcean(audioCtx: AudioContext, destination: AudioNode): SceneHandle {
+  const source = createLoopingNoiseSource(audioCtx, 'brown')
+
+  const lowpass = audioCtx.createBiquadFilter()
+  lowpass.type = 'lowpass'
+  lowpass.frequency.value = 700
+
+  const swell = audioCtx.createGain()
+  swell.gain.value = 0.7
+
+  const lfo = audioCtx.createOscillator()
+  lfo.frequency.value = 0.06
+  const lfoDepth = audioCtx.createGain()
+  lfoDepth.gain.value = 0.35
+  lfo.connect(lfoDepth)
+  lfoDepth.connect(swell.gain)
+
+  source.connect(lowpass)
+  lowpass.connect(swell)
+  swell.connect(destination)
+
+  source.start()
+  lfo.start()
+
+  return {
+    stop: () => {
+      source.stop()
+      lfo.stop()
+      source.disconnect()
+      lowpass.disconnect()
+      swell.disconnect()
+      lfo.disconnect()
+      lfoDepth.disconnect()
+    },
+  }
+}
+
+/** Wind: bandpass-filtered white noise with a slowly wandering center
+ * frequency and resonance, for a howling-gust character. */
+function buildWind(audioCtx: AudioContext, destination: AudioNode): SceneHandle {
+  const source = createLoopingNoiseSource(audioCtx, 'white')
+
+  const bandpass = audioCtx.createBiquadFilter()
+  bandpass.type = 'bandpass'
+  bandpass.frequency.value = 500
+  bandpass.Q.value = 0.7
+
+  const gain = audioCtx.createGain()
+  gain.gain.value = 0.5
+
+  const freqLfo = audioCtx.createOscillator()
+  freqLfo.frequency.value = 0.045
+  const freqDepth = audioCtx.createGain()
+  freqDepth.gain.value = 350
+  freqLfo.connect(freqDepth)
+  freqDepth.connect(bandpass.frequency)
+
+  const gustLfo = audioCtx.createOscillator()
+  gustLfo.frequency.value = 0.09
+  const gustDepth = audioCtx.createGain()
+  gustDepth.gain.value = 0.25
+  gustLfo.connect(gustDepth)
+  gustDepth.connect(gain.gain)
+
+  source.connect(bandpass)
+  bandpass.connect(gain)
+  gain.connect(destination)
+
+  source.start()
+  freqLfo.start()
+  gustLfo.start()
+
+  return {
+    stop: () => {
+      source.stop()
+      freqLfo.stop()
+      gustLfo.stop()
+      source.disconnect()
+      bandpass.disconnect()
+      gain.disconnect()
+      freqLfo.disconnect()
+      freqDepth.disconnect()
+      gustLfo.disconnect()
+      gustDepth.disconnect()
+    },
+  }
+}
+
+/** Plain white noise, gently lowpassed to take the harshest edge off —
+ * flat and steady, for masking rather than atmosphere. */
+function buildWhite(audioCtx: AudioContext, destination: AudioNode): SceneHandle {
+  const source = createLoopingNoiseSource(audioCtx, 'white')
+  const lowpass = audioCtx.createBiquadFilter()
+  lowpass.type = 'lowpass'
+  lowpass.frequency.value = 6000
+
+  const gain = audioCtx.createGain()
+  gain.gain.value = 0.35
+
+  source.connect(lowpass)
+  lowpass.connect(gain)
+  gain.connect(destination)
+  source.start()
+
+  return {
+    stop: () => {
+      source.stop()
+      source.disconnect()
+      lowpass.disconnect()
+      gain.disconnect()
+    },
+  }
+}
+
+/** Crickets: quick, high-pitched chirp bursts at randomized intervals —
+ * built the same way as the chimes scene's note scheduler, but faster,
+ * higher, and dry (no delay/reverb — crickets don't echo). */
+function buildCrickets(audioCtx: AudioContext, destination: AudioNode): SceneHandle {
+  let stopped = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const voices = new Set<{ osc: OscillatorNode; gain: GainNode }>()
+
+  function playChirp(): void {
+    const freq = 2600 + Math.random() * 1400
+    const pulses = 2 + Math.floor(Math.random() * 3)
+    const now = audioCtx.currentTime
+    const pulseGap = 0.045
+
+    for (let i = 0; i < pulses; i++) {
+      const osc = audioCtx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.value = freq + (Math.random() * 60 - 30)
+
+      const noteGain = audioCtx.createGain()
+      const start = now + i * pulseGap
+      const attackEnd = start + 0.004
+      const decayEnd = attackEnd + 0.03
+      noteGain.gain.setValueAtTime(0, start)
+      noteGain.gain.linearRampToValueAtTime(0.06, attackEnd)
+      noteGain.gain.exponentialRampToValueAtTime(0.0005, decayEnd)
+
+      osc.connect(noteGain)
+      noteGain.connect(destination)
+
+      const voice = { osc, gain: noteGain }
+      voices.add(voice)
+      osc.start(start)
+      osc.stop(decayEnd + 0.02)
+      osc.onended = () => {
+        osc.disconnect()
+        noteGain.disconnect()
+        voices.delete(voice)
+      }
+    }
+  }
+
+  function scheduleNext(): void {
+    const wait = (0.6 + Math.random() * 2.5) * 1000
+    timer = setTimeout(() => {
+      if (stopped) return
+      playChirp()
+      scheduleNext()
+    }, wait)
+  }
+
+  scheduleNext()
+
+  return {
+    stop: () => {
+      stopped = true
+      if (timer) clearTimeout(timer)
+      voices.forEach(({ osc, gain }) => {
+        osc.onended = null
+        osc.stop()
+        osc.disconnect()
+        gain.disconnect()
+      })
+      voices.clear()
+    },
+  }
+}
+
 const SCENE_BUILDERS: Record<AudioScene, SceneBuilder> = {
   rain: buildRain,
   pad: buildPad,
   brown: buildBrown,
   chimes: buildChimes,
+  ocean: buildOcean,
+  wind: buildWind,
+  white: buildWhite,
+  crickets: buildCrickets,
 }
 
 // ---------------------------------------------------------------------------

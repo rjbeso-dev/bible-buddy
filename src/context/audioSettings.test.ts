@@ -9,8 +9,17 @@ beforeEach(() => {
 })
 
 describe('audio settings', () => {
-  it('exposes the four ambient scenes in order', () => {
-    expect(AMBIENT_SCENES.map((s) => s.id)).toEqual(['rain', 'pad', 'brown', 'chimes'])
+  it('exposes the ambient scenes in order', () => {
+    expect(AMBIENT_SCENES.map((s) => s.id)).toEqual([
+      'rain',
+      'ocean',
+      'wind',
+      'pad',
+      'brown',
+      'white',
+      'chimes',
+      'crickets',
+    ])
   })
 
   it('has sensible defaults (never playing) that persist and round-trip', () => {

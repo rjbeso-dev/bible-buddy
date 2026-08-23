@@ -76,6 +76,10 @@ export interface UseNotesResult {
   updateNoteFields: (id: string, patch: Partial<StandaloneNoteInput>) => SaveNoteResult
   /** Record (or clear) a note's public share link id. */
   setNoteShareId: (id: string, shareId: string | undefined) => void
+  /** File (or unfile) a note into a folder. */
+  setNoteFolder: (id: string, folderId: string | undefined) => void
+  /** Unfile every note that was in the given folder (e.g. when it's deleted). */
+  clearFolderFromNotes: (folderId: string) => void
 }
 
 export function useNotes(): UseNotesResult {
@@ -166,6 +170,17 @@ export function useNotes(): UseNotesResult {
     )
   }, [])
 
+  /** File (or unfile, passing undefined) a note into a folder. */
+  const setNoteFolder = useCallback((id: string, folderId: string | undefined) => {
+    setNotes(getNotes().map((n) => (n.id === id ? { ...n, folderId } : n)))
+  }, [])
+
+  /** Clear a folder from every note that was filed in it — used when the
+   * folder itself is deleted, so notes aren't left pointing at nothing. */
+  const clearFolderFromNotes = useCallback((folderId: string) => {
+    setNotes(getNotes().map((n) => (n.folderId === folderId ? { ...n, folderId: undefined } : n)))
+  }, [])
+
   const notesFor = useCallback(
     (verseKey: string) => notes.filter((n) => n.verseKey === verseKey),
     [notes],
@@ -186,5 +201,7 @@ export function useNotes(): UseNotesResult {
     addStandaloneNote,
     updateNoteFields,
     setNoteShareId,
+    setNoteFolder,
+    clearFolderFromNotes,
   }
 }

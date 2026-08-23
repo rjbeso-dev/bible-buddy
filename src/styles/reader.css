@@ -901,6 +901,123 @@
   line-height: 1.55;
   white-space: pre-wrap;
 }
+.note-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+}
+
+/* ===========================================================================
+   Note folders
+   =========================================================================== */
+
+.notes-folder-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+.notes-folder-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.notes-folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.notes-folder-chip:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.notes-folder-chip.is-active {
+  background: var(--bg-sunken);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.notes-folder-add {
+  border-style: dashed;
+  color: var(--text-faint);
+}
+.notes-folder-rename-input {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  width: 9rem;
+}
+.notes-folder-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+}
+.notes-folder-empty {
+  text-align: left;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+
+.note-card-folder-picker {
+  position: relative;
+  display: inline-flex;
+}
+.note-card-folder-picker .icon-button.is-active {
+  color: var(--accent);
+}
+.note-card-folder-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.3rem);
+  z-index: 50;
+  width: max-content;
+  min-width: 11rem;
+  max-width: min(16rem, 92vw);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 0.35rem;
+  transform-origin: top right;
+  animation: pop-in var(--dur-fast) var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-card-folder-menu {
+    animation: none;
+  }
+}
+.note-card-folder-menu .note-export-item {
+  justify-content: space-between;
+}
+.note-card-folder-menu .note-export-item.is-active {
+  color: var(--accent);
+}
+.notes-folder-menu-empty {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.85rem;
+}
 
 /* ===========================================================================
    Note composer — full page, with an optional side Bible panel
@@ -1375,6 +1492,22 @@
 .note-bible-verse:hover {
   background: var(--surface-hover);
   color: var(--text);
+}
+.note-bible-verse.is-selected {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+}
+.note-bible-panel-selection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.note-bible-panel-selection span {
+  flex: 1;
 }
 .note-bible-panel-credit {
   margin: 0;

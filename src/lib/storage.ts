@@ -18,6 +18,8 @@ export const STORAGE_KEYS = {
   audio: `${STORAGE_PREFIX}audio`,
   railExpanded: `${STORAGE_PREFIX}railExpanded`,
   studyOpen: `${STORAGE_PREFIX}studyOpen`,
+  noteBibleLastRead: `${STORAGE_PREFIX}noteBibleLastRead`,
+  noteFolders: `${STORAGE_PREFIX}noteFolders`,
 } as const
 
 export const STORAGE_VERSION = 1

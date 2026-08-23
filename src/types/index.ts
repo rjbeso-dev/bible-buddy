@@ -99,8 +99,16 @@ export interface Note {
   /** Present once this note has been published to a public share link
    * (the id of its row in the `shared_notes` table). */
   shareId?: string
+  /** Present once the note's been moved into a folder (see NoteFolder). */
+  folderId?: string
   createdAt: number
   updatedAt: number
+}
+
+export interface NoteFolder {
+  id: string
+  name: string
+  createdAt: number
 }
 
 export interface CachedChapter {
@@ -129,7 +137,7 @@ export interface DailyVerse {
 export type ChapterStatus = 'idle' | 'loading' | 'ready' | 'error' | 'offline'
 
 /** Generated ambient soundscape identifiers. */
-export type AudioScene = 'rain' | 'pad' | 'brown' | 'chimes'
+export type AudioScene = 'rain' | 'pad' | 'brown' | 'chimes' | 'ocean' | 'wind' | 'white' | 'crickets'
 
 /** Whether the background player is using a generated scene or the user's own audio. */
 export type AudioMode = 'ambient' | 'custom'

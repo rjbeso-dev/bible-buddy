@@ -44,6 +44,7 @@ export type IconName =
   | 'download'
   | 'file-text'
   | 'share'
+  | 'folder'
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   name: IconName
@@ -235,6 +236,9 @@ const PATHS: Record<IconName, ReactElement> = {
       <circle cx="18" cy="19" r="2.5" />
       <path d="M8.2 10.6l7.6-4.2M8.2 13.4l7.6 4.2" />
     </>
+  ),
+  folder: (
+    <path d="M3.5 6.5a1 1 0 0 1 1-1h4.5l2 2h8.5a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-11z" />
   ),
 }
 

@@ -29,7 +29,7 @@ import {
   type AudioContextValue,
 } from './audioContext'
 
-const VALID_SCENES: AudioScene[] = ['rain', 'pad', 'brown', 'chimes']
+const VALID_SCENES: AudioScene[] = ['rain', 'pad', 'brown', 'chimes', 'ocean', 'wind', 'white', 'crickets']
 
 /** Load persisted audio settings defensively. Never restores a playing state. */
 function loadSettings(): Required<Pick<AudioSettings, 'mode' | 'scene' | 'volume'>> & {
