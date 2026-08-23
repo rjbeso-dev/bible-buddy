@@ -14,6 +14,16 @@ import {
   setCustomAudioErrorHandler,
 } from '../lib/audioEngine'
 import {
+  extractYouTubeId,
+  isYouTubeUrl,
+  registerYouTubeContainer,
+  ensureYouTubeVideo,
+  playYouTube,
+  pauseYouTube,
+  setYouTubeVolume,
+  destroyYouTubePlayer,
+} from '../lib/youtubeAudio'
+import {
   AudioPlayerContext,
   DEFAULT_AUDIO_SETTINGS,
   type AudioContextValue,
@@ -54,6 +64,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   // A local file was loaded this session (its object URL isn't persistable).
   const hasFileSource = useRef(false)
+  // The persistent DOM node the YouTube IFrame player attaches to — stays
+  // mounted regardless of the Sound popover's open/closed state, so a
+  // YouTube source keeps playing after the panel closes (same as ambient
+  // and file/stream playback already do).
+  const youtubeContainerRef = useRef<HTMLDivElement>(null)
+  const youtubeVideoId = mode === 'custom' ? extractYouTubeId(customUrl) : null
+
+  useEffect(() => {
+    registerYouTubeContainer(youtubeContainerRef.current)
+    return () => registerYouTubeContainer(null)
+  }, [])
 
   // Persist settings (never the playing state) whenever they change.
   useEffect(() => {
@@ -72,25 +93,50 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     return () => setCustomAudioErrorHandler(null)
   }, [])
 
-  const startCustom = useCallback(() => {
-    if (customUrl) {
-      setCustomAudioUrl(customUrl)
-    } else if (!hasFileSource.current) {
-      setError('Add a stream URL or choose a file first.')
-      setIsPlaying(false)
-      return
-    }
-    setCustomAudioVolume(volume)
-    playCustomAudio()
-      .then(() => {
-        setError(null)
-        setIsPlaying(true)
-      })
-      .catch(() => {
-        setError("Couldn't play that audio source.")
+  // Takes the URL explicitly (rather than reading `customUrl` state) so
+  // callers that just called setCustomUrlState() in the same tick — whose
+  // new value React hasn't re-rendered with yet — can still start the
+  // right source instead of racing the stale closure.
+  const startCustomFor = useCallback(
+    (url: string) => {
+      const videoId = extractYouTubeId(url)
+      if (videoId) {
+        ensureYouTubeVideo(videoId)
+          .then((title) => {
+            setYouTubeVolume(volume)
+            playYouTube()
+            setError(null)
+            setIsPlaying(true)
+            setCustomName(title)
+          })
+          .catch((err: Error) => {
+            setError(err.message || 'Couldn’t play that video.')
+            setIsPlaying(false)
+          })
+        return
+      }
+      if (url) {
+        setCustomAudioUrl(url)
+      } else if (!hasFileSource.current) {
+        setError('Add a stream URL or choose a file first.')
         setIsPlaying(false)
-      })
-  }, [customUrl, volume])
+        return
+      }
+      setCustomAudioVolume(volume)
+      playCustomAudio()
+        .then(() => {
+          setError(null)
+          setIsPlaying(true)
+        })
+        .catch(() => {
+          setError("Couldn't play that audio source.")
+          setIsPlaying(false)
+        })
+    },
+    [volume],
+  )
+
+  const startCustom = useCallback(() => startCustomFor(customUrl), [startCustomFor, customUrl])
 
   const play = useCallback(() => {
     setError(null)
@@ -105,6 +151,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const pause = useCallback(() => {
     stopAmbient()
     pauseCustomAudio()
+    pauseYouTube()
     setIsPlaying(false)
   }, [])
 
@@ -128,6 +175,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       if (wasPlaying) {
         stopAmbient()
         pauseCustomAudio()
+        pauseYouTube()
       }
       setModeState(next)
       setError(null)
@@ -147,21 +195,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setVolumeState(v)
     setAmbientVolume(v)
     setCustomAudioVolume(v)
+    setYouTubeVolume(v)
   }, [])
-
-  const restartCustomIfPlaying = useCallback(() => {
-    if (!isPlaying || mode !== 'custom') return
-    setCustomAudioVolume(volume)
-    playCustomAudio()
-      .then(() => {
-        setError(null)
-        setIsPlaying(true)
-      })
-      .catch(() => {
-        setError("Couldn't play that audio source.")
-        setIsPlaying(false)
-      })
-  }, [isPlaying, mode, volume])
 
   const setCustomUrl = useCallback(
     (url: string, name?: string) => {
@@ -169,10 +204,17 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setCustomUrlState(url)
       setCustomName(name ?? url)
       setError(null)
-      if (url) setCustomAudioUrl(url)
-      restartCustomIfPlaying()
+      if (isYouTubeUrl(url)) {
+        // startCustomFor below loads it through ensureYouTubeVideo — never
+        // through the plain <audio> element, which can't play a YouTube
+        // page at all.
+      } else {
+        destroyYouTubePlayer()
+        if (url) setCustomAudioUrl(url)
+      }
+      if (isPlaying && mode === 'custom') startCustomFor(url)
     },
-    [restartCustomIfPlaying],
+    [isPlaying, mode, startCustomFor],
   )
 
   const loadFile = useCallback(
@@ -182,13 +224,14 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setError('Audio playback is not supported in this browser.')
         return
       }
+      destroyYouTubePlayer()
       hasFileSource.current = true
       setCustomUrlState('') // object URLs don't survive a reload, so don't persist one
       setCustomName(file.name)
       setError(null)
-      restartCustomIfPlaying()
+      if (isPlaying && mode === 'custom') startCustomFor('')
     },
-    [restartCustomIfPlaying],
+    [isPlaying, mode, startCustomFor],
   )
 
   const value = useMemo<AudioContextValue>(
@@ -228,5 +271,22 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     ],
   )
 
-  return <AudioPlayerContext value={value}>{children}</AudioPlayerContext>
+  return (
+    <AudioPlayerContext value={value}>
+      {children}
+      {/* Persistent YouTube embed for the Sound feature's "custom" source.
+          Kept mounted (visibility toggled by CSS on this outer wrapper,
+          never on the inner node) regardless of the Sound popover's
+          open/closed state — the IFrame API replaces the inner div with
+          its own <iframe>, so React must never touch that node again
+          after mount. Stays visibly on-screen while active per YouTube's
+          embedding terms — it can't be hidden entirely. */}
+      <div
+        className={'youtube-audio-dock' + (youtubeVideoId ? ' is-active' : '')}
+        aria-hidden={!youtubeVideoId}
+      >
+        <div ref={youtubeContainerRef} />
+      </div>
+    </AudioPlayerContext>
+  )
 }

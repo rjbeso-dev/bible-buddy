@@ -132,12 +132,12 @@ export function MusicControls({ variant = 'header' }: MusicControlsProps = {}) {
               </div>
             ) : (
               <div className="music-section">
-                <span className="font-controls-label">Stream URL</span>
+                <span className="font-controls-label">Stream URL or YouTube link</span>
                 <div className="music-url-row">
                   <input
                     type="url"
                     className="settings-input"
-                    placeholder="https://…"
+                    placeholder="https://… or a YouTube link"
                     value={urlDraft}
                     spellCheck={false}
                     autoComplete="off"
