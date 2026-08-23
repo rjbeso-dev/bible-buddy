@@ -1191,6 +1191,11 @@
   border-bottom: 1px solid var(--border);
   border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
   background: var(--bg-sunken);
+  /* Stays on screen while scrolling a long note, instead of scrolling out
+     of view above the fold along with the title/reference fields. */
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 .rich-editor-tool {
   display: inline-flex;

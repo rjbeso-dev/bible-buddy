@@ -36,7 +36,7 @@ function isNote(v: unknown): v is Note {
     !!n &&
     typeof n === 'object' &&
     typeof n.id === 'string' &&
-    typeof n.verseKey === 'string' &&
+    (n.verseKey === undefined || typeof n.verseKey === 'string') &&
     typeof n.body === 'string' &&
     typeof n.updatedAt === 'number'
   )

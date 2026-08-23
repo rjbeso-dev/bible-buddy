@@ -6,6 +6,11 @@ function note(id: string, updatedAt: number, body = 'x'): Note {
   return { id, verseKey: 'john.1.1', reference: 'John 1:1', body, createdAt: updatedAt, updatedAt }
 }
 
+/** A standalone note (sermon prep, etc.) — no verseKey, per addStandaloneNote. */
+function standaloneNote(id: string, updatedAt: number, body = 'x'): Note {
+  return { id, title: 'Untitled', body, createdAt: updatedAt, updatedAt }
+}
+
 function recent(book: string, chapter: number, updatedAt: number): RecentChapter {
   return { book, chapter, translationId: 'web', updatedAt }
 }
@@ -24,6 +29,21 @@ describe('mergeState: notes (union by id, newer wins)', () => {
     const merged = mergeState(local, cloud)
     expect(merged.notes).toHaveLength(1)
     expect(merged.notes[0].body).toBe('new body')
+  })
+
+  it('keeps standalone notes (no verseKey) instead of dropping them', () => {
+    const local: Partial<SyncedState> = { notes: [standaloneNote('sermon-1', 1)] }
+    const merged = mergeState(local, {})
+    expect(merged.notes).toHaveLength(1)
+    expect(merged.notes[0].id).toBe('sermon-1')
+    expect(merged.notes[0].verseKey).toBeUndefined()
+  })
+
+  it('merges a mix of verse-tied and standalone notes from both sides', () => {
+    const local: Partial<SyncedState> = { notes: [note('a', 1), standaloneNote('b', 1)] }
+    const cloud: Partial<SyncedState> = { notes: [standaloneNote('c', 1)] }
+    const merged = mergeState(local, cloud)
+    expect(merged.notes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c'])
   })
 })
 
