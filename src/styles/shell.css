@@ -273,6 +273,25 @@
   height: 100%;
   border: none;
 }
+.youtube-audio-dock-close {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+.youtube-audio-dock-close:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
 @media (max-width: 640px) {
   .youtube-audio-dock.is-active {
     right: 0.6rem;

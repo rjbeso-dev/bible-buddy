@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { AudioMode, AudioScene, AudioSettings } from '../types'
 import { STORAGE_KEYS, readJSON, writeJSON } from '../lib/storage'
+import { Icon } from '../components/ui/Icon'
 import {
   startAmbientScene,
   stopAmbient,
@@ -279,12 +280,24 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           never on the inner node) regardless of the Sound popover's
           open/closed state — the IFrame API replaces the inner div with
           its own <iframe>, so React must never touch that node again
-          after mount. Stays visibly on-screen while active per YouTube's
-          embedding terms — it can't be hidden entirely. */}
+          after mount. Only shown while actually playing: YouTube's
+          embedding terms require it stay visible during playback, but a
+          paused/closed player has nothing playing to require that, so the
+          close button below just pauses — which also hides the dock — and
+          it reappears on its own the next time playback resumes. */}
       <div
-        className={'youtube-audio-dock' + (youtubeVideoId ? ' is-active' : '')}
-        aria-hidden={!youtubeVideoId}
+        className={'youtube-audio-dock' + (youtubeVideoId && isPlaying ? ' is-active' : '')}
+        aria-hidden={!(youtubeVideoId && isPlaying)}
       >
+        <button
+          type="button"
+          className="youtube-audio-dock-close"
+          onClick={pause}
+          aria-label="Close and pause"
+          title="Close and pause"
+        >
+          <Icon name="close" size={14} />
+        </button>
         <div ref={youtubeContainerRef} />
       </div>
     </AudioPlayerContext>

@@ -114,7 +114,7 @@ export function DashboardPage() {
               to={readerHref(daily.book, daily.chapter, daily.verse)}
               className="dash-inline-link"
             >
-              Read in context <Icon name="arrow-right" size={14} />
+              Read full chapter <Icon name="arrow-right" size={14} />
             </Link>
           </section>
         </div>
