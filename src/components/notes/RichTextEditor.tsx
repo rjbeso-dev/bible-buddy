@@ -6,10 +6,28 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type MouseEvent as ReactMouseEvent,
 } from 'react'
 import { Icon, type IconName } from '../ui/Icon'
 import { sanitizeNoteHtml } from '../../lib/sanitizeNoteHtml'
 import { fileToDataUrl, ImageTooLargeError } from '../../lib/imageToDataUrl'
+
+const MULTI_SELECT_CLASS = 'rte-block-selected'
+
+/** Walk up from a click target to the nearest "line" — a list item, or
+ * otherwise the nearest direct child of the editor body — for multi-select
+ * mode's click-to-toggle granularity. */
+function findSelectableBlock(node: Node | null, root: HTMLElement): HTMLElement | null {
+  let el: Node | null = node
+  while (el && el !== root) {
+    if (el instanceof HTMLElement) {
+      if (el.tagName === 'LI') return el
+      if (el.parentElement === root) return el
+    }
+    el = el.parentNode
+  }
+  return null
+}
 
 const FONT_STACKS: { label: string; value: string }[] = [
   { label: 'Serif', value: "'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif" },
@@ -64,6 +82,14 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     const didInit = useRef(false)
     const [lastHighlight, setLastHighlight] = useState(HIGHLIGHT_COLORS[0].hex)
     const [lastFontColor, setLastFontColor] = useState(FONT_COLORS[0].hex)
+    // Browsers (other than Firefox) only support one Selection range at a
+    // time, so there's no native way to hold several disjoint text ranges
+    // selected for formatting the way Word does. This tracks a set of whole
+    // "lines" (list items, or paragraphs/headings/etc.) instead — coarser
+    // than arbitrary text ranges, but it reaches the same end result and
+    // works the same in every browser.
+    const [multiSelectMode, setMultiSelectMode] = useState(false)
+    const [multiSelectBlocks, setMultiSelectBlocks] = useState<HTMLElement[]>([])
 
     // Set the starting content once; after that the DOM is the source of
     // truth (re-setting innerHTML on every keystroke would fight the caret).
@@ -105,44 +131,101 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       onChange(el.innerHTML, el.innerText)
     }, [onChange])
 
-    const exec = useCallback(
-      (command: string, value?: string) => {
-        editorRef.current?.focus()
-        document.execCommand(command, false, value)
+    // Runs `fn` once per selected "line" when multi-select mode has lines
+    // held (temporarily pointing the native Selection at each one in turn,
+    // since execCommand only ever acts on the current selection), or once
+    // against the normal restored selection otherwise — every formatting
+    // action funnels through here so multi-select is transparent to them.
+    const applyToSelection = useCallback(
+      (fn: () => void) => {
+        const el = editorRef.current
+        if (!el) return
+        if (multiSelectMode && multiSelectBlocks.length > 0) {
+          el.focus()
+          const sel = window.getSelection()
+          if (!sel) return
+          for (const block of multiSelectBlocks) {
+            const range = document.createRange()
+            range.selectNodeContents(block)
+            sel.removeAllRanges()
+            sel.addRange(range)
+            fn()
+          }
+        } else {
+          restoreSelection()
+          fn()
+        }
         emitChange()
       },
-      [emitChange],
+      [multiSelectMode, multiSelectBlocks, restoreSelection, emitChange],
+    )
+
+    const exec = useCallback(
+      (command: string, value?: string) => {
+        applyToSelection(() => document.execCommand(command, false, value))
+      },
+      [applyToSelection],
     )
 
     const highlight = useCallback(
       (hex: string | null) => {
-        restoreSelection()
-        document.execCommand('hiliteColor', false, hex ?? 'transparent')
-        if (hex) {
-          document.execCommand('foreColor', false, '#1a1a1a')
-          setLastHighlight(hex)
-        }
-        emitChange()
+        applyToSelection(() => {
+          document.execCommand('hiliteColor', false, hex ?? 'transparent')
+          if (hex) document.execCommand('foreColor', false, '#1a1a1a')
+        })
+        if (hex) setLastHighlight(hex)
       },
-      [restoreSelection, emitChange],
+      [applyToSelection],
     )
 
     const fontColor = useCallback(
       (hex: string | null) => {
         const el = editorRef.current
-        if (!el) return
-        restoreSelection()
-        // execCommand('foreColor', ...) doesn't understand cascade
-        // keywords — passing 'inherit' was observed applying
-        // rgba(0,0,0,0) (fully transparent, i.e. invisible text)
-        // rather than resetting anything. Resolve the theme's actual
-        // text color first so "default" sets a real, opaque value.
-        const resetColor = hex ?? getComputedStyle(el).color
-        document.execCommand('foreColor', false, resetColor)
+        applyToSelection(() => {
+          // execCommand('foreColor', ...) doesn't understand cascade
+          // keywords — passing 'inherit' was observed applying
+          // rgba(0,0,0,0) (fully transparent, i.e. invisible text)
+          // rather than resetting anything. Resolve the theme's actual
+          // text color first so "default" sets a real, opaque value.
+          const resetColor = hex ?? (el ? getComputedStyle(el).color : '#000')
+          document.execCommand('foreColor', false, resetColor)
+        })
         if (hex) setLastFontColor(hex)
-        emitChange()
       },
-      [restoreSelection, emitChange],
+      [applyToSelection],
+    )
+
+    const toggleMultiSelect = useCallback(() => {
+      setMultiSelectMode((wasOn) => {
+        if (wasOn) {
+          multiSelectBlocks.forEach((b) => b.classList.remove(MULTI_SELECT_CLASS))
+          setMultiSelectBlocks([])
+        }
+        return !wasOn
+      })
+    }, [multiSelectBlocks])
+
+    // Intercepted at mousedown (not click) so preventDefault actually stops
+    // the browser from placing a caret or starting a native drag-selection —
+    // by the time a click event fires, that's already happened.
+    const handleEditorMouseDown = useCallback(
+      (e: ReactMouseEvent<HTMLDivElement>) => {
+        if (!multiSelectMode) return
+        e.preventDefault()
+        const root = editorRef.current
+        if (!root) return
+        const block = findSelectableBlock(e.target as Node, root)
+        if (!block) return
+        setMultiSelectBlocks((prev) => {
+          if (prev.includes(block)) {
+            block.classList.remove(MULTI_SELECT_CLASS)
+            return prev.filter((b) => b !== block)
+          }
+          block.classList.add(MULTI_SELECT_CLASS)
+          return [...prev, block]
+        })
+      },
+      [multiSelectMode],
     )
 
     // Insert via the Range API rather than execCommand('insertHTML'): that
@@ -222,6 +305,15 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     return (
       <div className="rich-editor">
         <div className="rich-editor-toolbar" role="toolbar" aria-label="Formatting">
+          <ToolbarButton
+            label={multiSelectMode ? 'Exit multi-select' : 'Select multiple lines'}
+            icon="multi-select"
+            isActive={multiSelectMode}
+            onClick={toggleMultiSelect}
+          />
+
+          <span className="rich-editor-toolbar-divider" aria-hidden="true" />
+
           <ToolbarButton label="Bold" icon="bold" onClick={() => exec('bold')} />
           <ToolbarButton label="Italic" icon="italic" onClick={() => exec('italic')} />
           <ToolbarButton label="Underline" icon="underline" onClick={() => exec('underline')} />
@@ -344,6 +436,14 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
           </p>
         )}
 
+        {multiSelectMode && (
+          <p className="rich-editor-multiselect-hint">
+            Click lines to select or deselect them
+            {multiSelectBlocks.length > 0 ? ` (${multiSelectBlocks.length} selected)` : ''} — then use the
+            toolbar to format all of them at once.
+          </p>
+        )}
+
         <div
           ref={editorRef}
           className="rich-editor-body"
@@ -354,6 +454,15 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
           onBlur={saveRange}
           onKeyUp={saveRange}
           onMouseUp={saveRange}
+          onMouseDown={handleEditorMouseDown}
+          onKeyDown={(e) => {
+            // Multi-select mode is for picking lines to format, not typing —
+            // block ordinary text entry so a stray keystroke can't land in
+            // whatever range happens to still be active from the last format.
+            if (multiSelectMode && !(e.metaKey || e.ctrlKey) && e.key !== 'Escape') {
+              e.preventDefault()
+            }
+          }}
         />
       </div>
     )
@@ -364,14 +473,16 @@ interface ToolbarButtonProps {
   label: string
   icon: IconName
   onClick: () => void
+  isActive?: boolean
 }
 
-function ToolbarButton({ label, icon, onClick }: ToolbarButtonProps) {
+function ToolbarButton({ label, icon, onClick, isActive }: ToolbarButtonProps) {
   return (
     <button
       type="button"
-      className="rich-editor-tool"
+      className={'rich-editor-tool' + (isActive ? ' is-active' : '')}
       aria-label={label}
+      aria-pressed={isActive}
       title={label}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}

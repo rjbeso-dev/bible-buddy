@@ -45,6 +45,7 @@ export type IconName =
   | 'file-text'
   | 'share'
   | 'folder'
+  | 'multi-select'
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   name: IconName
@@ -239,6 +240,18 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
   folder: (
     <path d="M3.5 6.5a1 1 0 0 1 1-1h4.5l2 2h8.5a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-11z" />
+  ),
+  'multi-select': (
+    <>
+      <rect x="3.5" y="4.5" width="3" height="3" rx="0.6" />
+      <path d="M4.2 6l0.6 0.6 1.1-1.3" />
+      <path d="M9.5 6h11" />
+      <rect x="3.5" y="10.5" width="3" height="3" rx="0.6" />
+      <path d="M9.5 12h8" />
+      <rect x="3.5" y="16.5" width="3" height="3" rx="0.6" />
+      <path d="M4.2 18l0.6 0.6 1.1-1.3" />
+      <path d="M9.5 18h11" />
+    </>
   ),
 }
 

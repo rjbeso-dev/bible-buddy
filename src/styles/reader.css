@@ -1208,6 +1208,25 @@
   background: var(--surface-hover);
   color: var(--text);
 }
+.rich-editor-tool.is-active {
+  background: var(--bg-sunken);
+  border-color: var(--border-strong);
+  color: var(--accent);
+}
+.rich-editor-multiselect-hint {
+  margin: 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border);
+}
+.rich-editor-body .rte-block-selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
 .rich-editor-toolbar-divider {
   width: 1px;
   align-self: stretch;
