@@ -19,13 +19,17 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 export async function recordSignIn(userId: string, email: string | undefined): Promise<void> {
   if (!supabase || !email) return
   try {
-    await supabase.from('user_directory').upsert({
+    const { error } = await supabase.from('user_directory').upsert({
       user_id: userId,
       email,
       last_seen_at: new Date().toISOString(),
     })
-  } catch {
-    // Never let this block sign-in.
+    // supabase-js resolves (doesn't throw) on query/RLS errors, so this check
+    // is the only way a failed upsert is ever visible — without it, a broken
+    // policy or missing table fails completely silently.
+    if (error) console.warn('[recordSignIn] failed to record sign-in:', error)
+  } catch (err) {
+    console.warn('[recordSignIn] failed to record sign-in:', err)
   }
 }
 
