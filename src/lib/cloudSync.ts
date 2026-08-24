@@ -159,20 +159,6 @@ export function mergeState(
   }
 }
 
-/** Upsert the current local snapshot into the user's cloud row. Best-effort. */
-export async function pushSnapshot(userId: string): Promise<void> {
-  if (!supabase) return
-  try {
-    await supabase.from('user_state').upsert({
-      user_id: userId,
-      data: snapshotLocal(),
-      updated_at: new Date().toISOString(),
-    })
-  } catch {
-    // Sync is best-effort — never let a network/RLS failure reach the UI.
-  }
-}
-
 /**
  * Whether whatever's sitting in localStorage right now was left behind by a
  * *different* signed-in account, rather than being this device's own
@@ -185,6 +171,35 @@ export async function pushSnapshot(userId: string): Promise<void> {
  */
 export function isForeignLocalData(owner: string | null, userId: string): boolean {
   return owner !== null && owner !== userId
+}
+
+/**
+ * Upsert the current local snapshot into the user's cloud row. Best-effort.
+ *
+ * Refuses to push if the local "sync owner" marker doesn't match `userId`.
+ * This is the actual write gate — it's not enough for pullAndMerge to be
+ * careful, because pushSnapshot is *also* called independently by
+ * SyncProvider's debounced "local data changed" listener, on every synced
+ * write while signed in. If pullAndMerge hasn't run yet (or got skipped —
+ * this is exactly how a previous account's leftover local data ended up
+ * permanently written into another account's cloud row in production,
+ * confirmed via matching notes/timestamps in both rows), that listener would
+ * otherwise happily upload whoever's data is currently sitting in
+ * localStorage to whichever user is currently signed in.
+ */
+export async function pushSnapshot(userId: string): Promise<void> {
+  if (!supabase) return
+  const owner = readJSON<string | null>(STORAGE_KEYS.syncOwner, null)
+  if (isForeignLocalData(owner, userId)) return
+  try {
+    await supabase.from('user_state').upsert({
+      user_id: userId,
+      data: snapshotLocal(),
+      updated_at: new Date().toISOString(),
+    })
+  } catch {
+    // Sync is best-effort — never let a network/RLS failure reach the UI.
+  }
 }
 
 /**
