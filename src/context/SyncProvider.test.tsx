@@ -72,4 +72,37 @@ describe('SyncProvider: reload-loop regression', () => {
     expect(pullAndMerge).toHaveBeenCalledTimes(1)
     expect(window.location.reload).toHaveBeenCalledTimes(1)
   })
+
+  it('does not skip the reload when the user object reference changes (same id) while pullAndMerge is in flight', async () => {
+    // AuthProvider sets `user` from two separate paths right after sign-in —
+    // getSession() resolving, and onAuthStateChange's own initial event —
+    // each producing a distinct object for the *same* logical session. Model
+    // that: a second render with a same-id-but-different-object user arrives
+    // mid-flight.
+    let resolvePull: () => void = () => {}
+    vi.mocked(pullAndMerge).mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolvePull = resolve
+      }),
+    )
+
+    const userA = { id: 'user-1', email: 'a@example.com' } as User
+    const userB = { id: 'user-1', email: 'a@example.com' } as User // new object, same id
+
+    const { rerender } = render(<Wrapper value={authValue({ loading: false, user: userA })} />)
+    // recordSignIn() resolves as a microtask before pullAndMerge is called,
+    // so wait for that call to actually happen before rerendering mid-flight.
+    await waitFor(() => expect(pullAndMerge).toHaveBeenCalledTimes(1))
+
+    rerender(<Wrapper value={authValue({ loading: false, user: userB })} />)
+
+    resolvePull()
+    // The bug: if the effect's cleanup ran on that rerender (because `user`
+    // was compared by reference), `cancelled` was set to true, and the
+    // reload below got silently skipped even though pullAndMerge's writes
+    // had already completed — leaving a stale pre-sync page on screen until
+    // a manual refresh.
+    await waitFor(() => expect(window.location.reload).toHaveBeenCalledTimes(1))
+    expect(pullAndMerge).toHaveBeenCalledTimes(1)
+  })
 })

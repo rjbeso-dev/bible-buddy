@@ -101,7 +101,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [enabled, user, loading])
+    // Deliberately depend on user?.id, not `user` itself: AuthProvider sets
+    // `user` from two separate paths right after sign-in (getSession()
+    // resolving, and onAuthStateChange's own initial event), each producing
+    // a distinct object for the *same* logical session. Depending on the
+    // object meant this effect re-ran (cancelling the in-flight pull+reload
+    // above via React's cleanup) purely because the reference changed, even
+    // though nothing about the signed-in user actually had. pullAndMerge's
+    // writes had already landed by the time it noticed `cancelled`, but the
+    // reload got silently skipped — leaving a stale pre-sync page on screen
+    // until a manual refresh re-read the (already-correct) local storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, user?.id, loading])
 
   useEffect(() => {
     if (!enabled || !user) return
@@ -117,7 +128,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('bsa:datachanged', onDataChanged)
       if (pushTimer.current) clearTimeout(pushTimer.current)
     }
-  }, [enabled, user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, user?.id])
 
   return <>{children}</>
 }
