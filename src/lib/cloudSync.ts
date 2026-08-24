@@ -4,7 +4,7 @@
 // flaky network or an unconfigured backend can never break the app.
 
 import type { Highlight, LastRead, Note, RecentChapter, Settings } from '../types'
-import { STORAGE_KEYS, readJSON, writeJSON } from './storage'
+import { STORAGE_KEYS, readJSON, writeJSON, removeKey } from './storage'
 import { supabase } from './supabase'
 import { RECENT_CAP, chapterKey } from '../hooks/useReadingProgress'
 
@@ -174,6 +174,20 @@ export async function pushSnapshot(userId: string): Promise<void> {
 }
 
 /**
+ * Whether whatever's sitting in localStorage right now was left behind by a
+ * *different* signed-in account, rather than being this device's own
+ * pre-account data. `null` means no account has ever synced on this device
+ * (a fresh install, or local-only use) — that data is fair game to merge in,
+ * same as always. A mismatch means someone else signed in on this browser
+ * and signed out without switching back: their notes/highlights/progress
+ * must not be merged into (and thereby leaked into, and permanently mixed
+ * into the cloud row of) whoever signs in next.
+ */
+export function isForeignLocalData(owner: string | null, userId: string): boolean {
+  return owner !== null && owner !== userId
+}
+
+/**
  * Fetch the user's cloud row, merge it with whatever's local, write the
  * merged result back into localStorage, then push the merged blob back up so
  * both sides agree.
@@ -188,13 +202,32 @@ export async function pullAndMerge(userId: string): Promise<void> {
       .maybeSingle()
     if (error) return
     const cloud = (data?.data ?? null) as Partial<SyncedState> | null
-    const merged = mergeState(snapshotLocal(), cloud)
+
+    const owner = readJSON<string | null>(STORAGE_KEYS.syncOwner, null)
+    const foreign = isForeignLocalData(owner, userId)
+    if (foreign) {
+      // Wipe the previous account's leftovers outright rather than merging
+      // them in — an `if (merged.x)` guard further down would otherwise
+      // leave a stale value in place when both this account's cloud and the
+      // discarded local side are empty for that field.
+      removeKey(STORAGE_KEYS.notes)
+      removeKey(STORAGE_KEYS.highlights)
+      removeKey(STORAGE_KEYS.readChapters)
+      removeKey(STORAGE_KEYS.recentChapters)
+      removeKey(STORAGE_KEYS.settings)
+      removeKey(STORAGE_KEYS.lastRead)
+      removeKey(STORAGE_KEYS.noteFolders)
+    }
+    const local = foreign ? {} : snapshotLocal()
+
+    const merged = mergeState(local, cloud)
     writeJSON(STORAGE_KEYS.notes, merged.notes)
     writeJSON(STORAGE_KEYS.highlights, merged.highlights)
     writeJSON(STORAGE_KEYS.readChapters, merged.readChapters)
     writeJSON(STORAGE_KEYS.recentChapters, merged.recentChapters)
     if (merged.settings) writeJSON(STORAGE_KEYS.settings, merged.settings)
     if (merged.lastRead) writeJSON(STORAGE_KEYS.lastRead, merged.lastRead)
+    writeJSON(STORAGE_KEYS.syncOwner, userId)
     await pushSnapshot(userId)
   } catch {
     // Sync is best-effort — leave local data untouched on failure.

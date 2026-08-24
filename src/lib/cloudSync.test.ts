@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mergeState, type SyncedState } from './cloudSync'
+import { mergeState, isForeignLocalData, type SyncedState } from './cloudSync'
 import type { Note, RecentChapter } from '../types'
 
 function note(id: string, updatedAt: number, body = 'x'): Note {
@@ -145,5 +145,19 @@ describe('mergeState: lastRead (newer updatedAt wins)', () => {
       settings: null,
       lastRead: null,
     })
+  })
+})
+
+describe('isForeignLocalData', () => {
+  it('is not foreign when no account has ever synced on this device', () => {
+    expect(isForeignLocalData(null, 'user-a')).toBe(false)
+  })
+
+  it('is not foreign when the same account is signing in again', () => {
+    expect(isForeignLocalData('user-a', 'user-a')).toBe(false)
+  })
+
+  it('is foreign when a different account left data behind on this device', () => {
+    expect(isForeignLocalData('user-a', 'user-b')).toBe(true)
   })
 })

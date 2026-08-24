@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   studyOpen: `${STORAGE_PREFIX}studyOpen`,
   noteBibleLastRead: `${STORAGE_PREFIX}noteBibleLastRead`,
   noteFolders: `${STORAGE_PREFIX}noteFolders`,
+  syncOwner: `${STORAGE_PREFIX}sync.owner`,
 } as const
 
 export const STORAGE_VERSION = 1
