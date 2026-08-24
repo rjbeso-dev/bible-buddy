@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from './useAuth'
 import { pullAndMerge, pushSnapshot } from '../lib/cloudSync'
+import { recordSignIn } from '../lib/adminDirectory'
 
 const PUSH_DEBOUNCE_MS = 1500
 const PULLED_FLAG_PREFIX = 'bsa.sync.pulled.'
@@ -33,12 +34,13 @@ function markPulledThisSession(userId: string): void {
 
 /**
  * Drives cloud sync while signed in. On sign-in (once per tab per user,
- * tracked via sessionStorage), pulls the cloud snapshot, merges it with local
- * data, writes the merge back to localStorage, then reloads once so every
- * hook re-hydrates from the merged state. While signed in, listens for the
- * `bsa:datachanged` event (dispatched by storage.ts on every synced-key
- * write) and debounce-pushes the local snapshot to the cloud. A no-op tree
- * when Supabase isn't configured or no one is signed in.
+ * tracked via sessionStorage), records the sign-in in the directory, pulls
+ * the cloud snapshot, merges it with local data, writes the merge back to
+ * localStorage, then reloads once so every hook re-hydrates from the merged
+ * state. While signed in, listens for the `bsa:datachanged` event
+ * (dispatched by storage.ts on every synced-key write) and debounce-pushes
+ * the local snapshot to the cloud. A no-op tree when Supabase isn't
+ * configured or no one is signed in.
  */
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { user, enabled } = useAuth()
@@ -54,11 +56,17 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     syncedUserId.current = user.id
     if (hasPulledThisSession(user.id)) return
     let cancelled = false
-    pullAndMerge(user.id).then(() => {
-      if (cancelled) return
-      markPulledThisSession(user.id)
-      window.location.reload()
-    })
+    // Record the sign-in before pulling/merging: pullAndMerge ends in a full
+    // page reload, which would otherwise race recordSignIn's own request and
+    // can cancel it mid-flight before it reaches the server — sequencing it
+    // first guarantees it always completes.
+    recordSignIn()
+      .then(() => pullAndMerge(user.id))
+      .then(() => {
+        if (cancelled) return
+        markPulledThisSession(user.id)
+        window.location.reload()
+      })
     return () => {
       cancelled = true
     }
