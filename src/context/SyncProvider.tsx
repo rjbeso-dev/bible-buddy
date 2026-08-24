@@ -33,6 +33,27 @@ function markPulledThisSession(userId: string): void {
 }
 
 /**
+ * Clear every "already pulled" flag. Called on sign-out so that the next
+ * sign-in in this tab — even for a user id that was already pulled earlier
+ * today — gets a fresh pullAndMerge instead of being skipped. Without this,
+ * switching accounts in one long-lived tab (sign out, sign in as someone
+ * else, sign out, sign back in as the first user) would silently reuse a
+ * stale flag and never re-run the merge/ownership check on repeat visits.
+ */
+function clearPulledFlags(): void {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i)
+      if (key && key.startsWith(PULLED_FLAG_PREFIX)) keys.push(key)
+    }
+    for (const key of keys) sessionStorage.removeItem(key)
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Drives cloud sync while signed in. On sign-in (once per tab per user,
  * tracked via sessionStorage), records the sign-in in the directory, pulls
  * the cloud snapshot, merges it with local data, writes the merge back to
@@ -50,6 +71,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!enabled || !user) {
       syncedUserId.current = null
+      clearPulledFlags()
       return
     }
     if (syncedUserId.current === user.id) return
