@@ -64,11 +64,20 @@ function clearPulledFlags(): void {
  * configured or no one is signed in.
  */
 export function SyncProvider({ children }: { children: ReactNode }) {
-  const { user, enabled } = useAuth()
+  const { user, enabled, loading } = useAuth()
   const syncedUserId = useRef<string | null>(null)
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    // AuthProvider reports {user: null, loading: true} for a moment on every
+    // fresh page load — including the reload this effect itself triggers
+    // below — until getSession() resolves. Treating that transient null as a
+    // genuine sign-out wiped the "already pulled" flag this effect had just
+    // set, which re-triggered pullAndMerge + another reload on the very next
+    // render: an infinite loop, seen in production as the app stuck
+    // "loading" forever right after signing in. Do nothing at all until the
+    // real auth state is known.
+    if (loading) return
     if (!enabled || !user) {
       syncedUserId.current = null
       clearPulledFlags()
@@ -92,7 +101,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [enabled, user])
+  }, [enabled, user, loading])
 
   useEffect(() => {
     if (!enabled || !user) return
