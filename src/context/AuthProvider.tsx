@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const maybeRecordSignIn = useCallback((next: User | null) => {
     if (!next || recordedFor.current === next.id) return
     recordedFor.current = next.id
-    void recordSignIn(next.id, next.email)
+    void recordSignIn()
   }, [])
 
   useEffect(() => {

@@ -15,13 +15,26 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 
 /** Upsert the current user's own row (email + last_seen_at) — RLS only
  * allows a user to write their own row, never anyone else's. Best-effort,
- * same as the rest of the app's sync calls. */
-export async function recordSignIn(userId: string, email: string | undefined): Promise<void> {
-  if (!supabase || !email) return
+ * same as the rest of the app's sync calls.
+ *
+ * Deliberately re-reads the live session instead of trusting a passed-in
+ * user id: this gets called right out of an onAuthStateChange handler, and
+ * during a fast sign-out/sign-in cycle a stale closure-captured id can
+ * disagree with whatever session the client actually attaches to the
+ * request by the time it goes out — which RLS's `auth.uid() = user_id`
+ * check then rejects outright (seen in production as a 42501 "new row
+ * violates row-level security policy" error). Reading the session fresh
+ * here guarantees the payload can never disagree with the request's own
+ * auth token. */
+export async function recordSignIn(): Promise<void> {
+  if (!supabase) return
   try {
+    const { data } = await supabase.auth.getSession()
+    const user = data.session?.user
+    if (!user?.email) return
     const { error } = await supabase.from('user_directory').upsert({
-      user_id: userId,
-      email,
+      user_id: user.id,
+      email: user.email,
       last_seen_at: new Date().toISOString(),
     })
     // supabase-js resolves (doesn't throw) on query/RLS errors, so this check
