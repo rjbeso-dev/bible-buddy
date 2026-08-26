@@ -1472,6 +1472,17 @@
   left: auto;
   right: 0;
   transform-origin: top right;
+  /* The default 38rem/70vh size fits comfortably beside the full-width
+     reader toolbar it was designed for, but at that size in this 22rem
+     sidebar it swallowed most of the note editor underneath — some overlap
+     into the wider main column is unavoidable (the panel is necessarily
+     wider than its own trigger's column), but there's no reason for it to
+     be this large here. */
+  width: min(26rem, 88vw);
+}
+.note-bible-panel .book-picker-columns {
+  grid-template-columns: 9rem 1fr;
+  height: min(55vh, 26rem);
 }
 .note-bible-panel-header {
   display: flex;

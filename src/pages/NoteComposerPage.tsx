@@ -396,6 +396,7 @@ export function NoteComposerPage() {
           <NoteBiblePanel
             onInsert={(html) => editorRef.current?.insertHtml(html)}
             onClose={() => setBibleOpen(false)}
+            initialVerseKey={existing?.verseKey}
           />
         )}
       </div>

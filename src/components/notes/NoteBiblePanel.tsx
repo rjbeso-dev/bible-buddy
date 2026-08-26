@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useSettings } from '../../context/useSettings'
 import { useChapter } from '../../hooks/useChapter'
 import { getBook } from '../../data/books'
-import { formatReference } from '../../lib/references'
+import { formatReference, parseVerseKey } from '../../lib/references'
 import { STORAGE_KEYS, readJSON, writeJSON } from '../../lib/storage'
 import { BookChapterPicker } from '../navigation/BookChapterPicker'
 import { TranslationSelect } from '../reader/TranslationSelect'
@@ -11,6 +11,11 @@ import { Icon } from '../ui/Icon'
 interface NoteBiblePanelProps {
   onInsert: (html: string) => void
   onClose: () => void
+  /** The note's own verse tie, if any — takes priority over the
+   * last-used-anywhere fallback below, so reopening a verse-tied note's
+   * Bible panel lands on that note's own verse rather than wherever some
+   * other note last left the panel. */
+  initialVerseKey?: string
 }
 
 interface LastRead {
@@ -18,7 +23,9 @@ interface LastRead {
   chapter: number
 }
 
-function readLastBook(): LastRead {
+export function readLastBook(initialVerseKey: string | undefined): LastRead {
+  const parsed = initialVerseKey ? parseVerseKey(initialVerseKey) : null
+  if (parsed && getBook(parsed.book)) return { book: parsed.book, chapter: parsed.chapter }
   const saved = readJSON<LastRead | null>(STORAGE_KEYS.noteBibleLastRead, null)
   return saved && getBook(saved.book) ? saved : { book: 'john', chapter: 1 }
 }
@@ -34,9 +41,9 @@ function escapeHtml(s: string): string {
  * it into the note, so writing a sermon or study note never means leaving
  * the page to go check a reference. Shift-click extends a range so several
  * verses land in a single combined quote instead of one bubble each. */
-export function NoteBiblePanel({ onInsert, onClose }: NoteBiblePanelProps) {
+export function NoteBiblePanel({ onInsert, onClose, initialVerseKey }: NoteBiblePanelProps) {
   const { settings } = useSettings()
-  const initial = useState(readLastBook)[0]
+  const initial = useState(() => readLastBook(initialVerseKey))[0]
   const [book, setBookState] = useState(initial.book)
   const [chapter, setChapterState] = useState(initial.chapter)
   const [translationId, setTranslationId] = useState(settings.primaryTranslation)
