@@ -71,6 +71,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // and file/stream playback already do).
   const youtubeContainerRef = useRef<HTMLDivElement>(null)
   const youtubeVideoId = mode === 'custom' ? extractYouTubeId(customUrl) : null
+  // Shrinks the dock further without pausing — YouTube's embedding terms
+  // require the player stay visible while playing, but say nothing about
+  // how large, so a small still-visible dock is fine (same idea as
+  // YouTube's own miniplayer).
+  const [dockMinimized, setDockMinimized] = useState(false)
 
   useEffect(() => {
     registerYouTubeContainer(youtubeContainerRef.current)
@@ -286,9 +291,22 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           close button below just pauses — which also hides the dock — and
           it reappears on its own the next time playback resumes. */}
       <div
-        className={'youtube-audio-dock' + (youtubeVideoId && isPlaying ? ' is-active' : '')}
+        className={
+          'youtube-audio-dock' +
+          (youtubeVideoId && isPlaying ? ' is-active' : '') +
+          (dockMinimized ? ' is-minimized' : '')
+        }
         aria-hidden={!(youtubeVideoId && isPlaying)}
       >
+        <button
+          type="button"
+          className="youtube-audio-dock-minimize"
+          onClick={() => setDockMinimized((m) => !m)}
+          aria-label={dockMinimized ? 'Restore video size' : 'Minimize video'}
+          title={dockMinimized ? 'Restore video size' : 'Minimize video'}
+        >
+          <Icon name="chevron-down" size={14} className={dockMinimized ? 'is-flipped' : undefined} />
+        </button>
         <button
           type="button"
           className="youtube-audio-dock-close"

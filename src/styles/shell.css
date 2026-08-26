@@ -273,10 +273,17 @@
   height: 100%;
   border: none;
 }
-.youtube-audio-dock-close {
+/* Smaller but still genuinely visible — YouTube's embedding terms require
+   the player stay visible while playing, they don't require any particular
+   size (their own miniplayer works the same way). */
+.youtube-audio-dock.is-minimized.is-active {
+  width: 90px;
+  height: 51px;
+}
+.youtube-audio-dock-close,
+.youtube-audio-dock-minimize {
   position: absolute;
   top: 0.3rem;
-  right: 0.3rem;
   z-index: 1;
   display: inline-flex;
   align-items: center;
@@ -289,8 +296,18 @@
   color: #fff;
   cursor: pointer;
 }
-.youtube-audio-dock-close:hover {
+.youtube-audio-dock-close {
+  right: 0.3rem;
+}
+.youtube-audio-dock-minimize {
+  right: 2.1rem;
+}
+.youtube-audio-dock-close:hover,
+.youtube-audio-dock-minimize:hover {
   background: rgba(0, 0, 0, 0.8);
+}
+.youtube-audio-dock-minimize .is-flipped {
+  transform: rotate(180deg);
 }
 @media (max-width: 640px) {
   .youtube-audio-dock.is-active {
@@ -298,6 +315,10 @@
     bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px) + 0.6rem);
     width: 150px;
     height: 84px;
+  }
+  .youtube-audio-dock.is-minimized.is-active {
+    width: 90px;
+    height: 51px;
   }
 }
 

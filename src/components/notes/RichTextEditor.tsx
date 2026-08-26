@@ -169,9 +169,21 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
 
     const highlight = useCallback(
       (hex: string | null) => {
+        const el = editorRef.current
         applyToSelection(() => {
           document.execCommand('hiliteColor', false, hex ?? 'transparent')
-          if (hex) document.execCommand('foreColor', false, '#1a1a1a')
+          if (hex) {
+            document.execCommand('foreColor', false, '#1a1a1a')
+          } else {
+            // Removing a highlight must also undo the dark text color
+            // forced on above when it was applied — otherwise the text is
+            // left with a hardcoded near-black color that's unreadable
+            // against a dark-mode background. Same reset as "default text
+            // color" below: 'inherit' doesn't work here (resolves to fully
+            // transparent), so resolve the theme's actual current color.
+            const resetColor = el ? getComputedStyle(el).color : '#000'
+            document.execCommand('foreColor', false, resetColor)
+          }
         })
         if (hex) setLastHighlight(hex)
       },
