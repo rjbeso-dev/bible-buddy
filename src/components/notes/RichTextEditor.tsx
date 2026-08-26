@@ -9,7 +9,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 import { Icon, type IconName } from '../ui/Icon'
-import { sanitizeNoteHtml } from '../../lib/sanitizeNoteHtml'
+import { sanitizeNoteHtml, plainTextToHtml } from '../../lib/sanitizeNoteHtml'
 import { fileToDataUrl, ImageTooLargeError } from '../../lib/imageToDataUrl'
 
 const MULTI_SELECT_CLASS = 'rte-block-selected'
@@ -27,6 +27,24 @@ function findSelectableBlock(node: Node | null, root: HTMLElement): HTMLElement 
     el = el.parentNode
   }
   return null
+}
+
+/** Strip inline foreground-color styling from pasted HTML — external
+ * sources (Google Docs, Word, etc.) bake in an explicit color that assumes
+ * their own light/dark background, which then fights this app's theme once
+ * pasted in here (fine in the theme the source assumed, unreadable in the
+ * other — the same failure mode as the highlight/foreColor bug). Only
+ * color is touched; every other bit of pasted formatting (bold, italic,
+ * size, structure) is left exactly as copied. */
+export function stripPastedTextColor(html: string): string {
+  const template = document.createElement('template')
+  template.innerHTML = html
+  template.content.querySelectorAll<HTMLElement>('*').forEach((el) => {
+    el.style.removeProperty('color')
+    el.style.removeProperty('-webkit-text-fill-color')
+    if (el.tagName === 'FONT') el.removeAttribute('color')
+  })
+  return template.innerHTML
 }
 
 const FONT_STACKS: { label: string; value: string }[] = [
@@ -474,6 +492,16 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
             if (multiSelectMode && !(e.metaKey || e.ctrlKey) && e.key !== 'Escape') {
               e.preventDefault()
             }
+          }}
+          onPaste={(e) => {
+            e.preventDefault()
+            const html = e.clipboardData.getData('text/html')
+            if (html) {
+              insertHtmlAtCursor(stripPastedTextColor(html))
+              return
+            }
+            const text = e.clipboardData.getData('text/plain')
+            if (text) insertHtmlAtCursor(plainTextToHtml(text))
           }}
         />
       </div>
